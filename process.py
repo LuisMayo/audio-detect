@@ -39,35 +39,24 @@ if len(sys.argv) >= 2:
 if len(sys.argv) >= 3:
     config['source_path'] = sys.argv[2]
 
-print('Config')
-print('  Hz Min Score: {}'.format(config['matching_min_score']))
-
 #--------------------------------------------------
 
 start_time = datetime.datetime.now()
 
 #--------------------------------------------------
 
-print('Load Source')
-
 if not os.path.exists(config['source_path']):
-    print('Missing source file')
     sys.exit()
 
 source_series = pcm_data(config['source_path'], sample_rate)
 
 source_time_total = (float(len(source_series)) / sample_rate)
 
-print('  {} ({} & {})'.format(config['source_path'], source_time_total, sample_rate))
-
 #--------------------------------------------------
-
-print('Load Samples')
 
 samples = []
 
 if not os.path.exists(config['matching_samples']):
-    print('Missing samples folder: ' + config['matching_samples'])
     sys.exit()
 
 if os.path.isdir(config['matching_samples']):
@@ -114,20 +103,16 @@ for sample_path in files:
                 sample_data
             ])
 
-        print('  {} ({}/{})'.format(sample_path, sample_start, sample_end))
 
 #--------------------------------------------------
 # Processing
 
-print('Processing')
 
 source_frames, fft_window, n_columns = stft_raw(source_series, sample_rate, win_length, hop_length, hz_count, dtype)
 
 if config['source_frame_end'] == None:
    config['source_frame_end'] = source_frames.shape[1]
 
-print('    From {} to {}'.format(config['source_frame_start'], config['source_frame_end']))
-print('    From {} to {}'.format(((float(config['source_frame_start']) * hop_length) / sample_rate), ((float(config['source_frame_end']) * hop_length) / sample_rate)))
 
 matching = {}
 match_count = 0
@@ -151,15 +136,12 @@ for block_start in range(config['source_frame_start'], config['source_frame_end'
 
     set_data = abs((scipy.fft.fft(fft_window * source_frames[:, block_start:block_end], axis=0)).astype(dtype))
 
-    print('  {} to {} - {}'.format(block_start, block_end, str(datetime.timedelta(seconds=((float(block_start) * hop_length) / sample_rate)))))
 
     x = 0
     x_max = (block_end - block_start)
     while x < x_max:
 
         if match_skipping > 0:
-            if x == 0:
-                print('    Skipping {}'.format(match_skipping))
             match_skipping -= 1
             x += 1
             continue
@@ -182,7 +164,6 @@ for block_start in range(config['source_frame_start'], config['source_frame_end'
 
                     match_start_time = ((float(x + block_start - samples[sample_id][1]) * hop_length) / sample_rate)
 
-                    print('    Match {}/{}: Complete at {} @ {}'.format(matching_id, sample_id, sample_x, match_start_time))
 
                     results_end[sample_id][sample_x] += 1
 
@@ -196,7 +177,6 @@ for block_start in range(config['source_frame_start'], config['source_frame_end'
 
                     if config['matching_skip']:
                         match_skipping = ((config['matching_skip'] * sample_rate) / hop_length)
-                        print('    Skipping {}'.format(match_skipping))
                         matching = {}
                         break # No more 'matching' entires
                     else:
@@ -205,17 +185,14 @@ for block_start in range(config['source_frame_start'], config['source_frame_end'
 
                 else:
 
-                    print('    Match {}/{}: Update to {} ({} < {})'.format(matching_id, sample_id, sample_x, hz_score, config['matching_min_score']))
                     matching[matching_id][1] = sample_x
 
             elif matching[matching_id][2] < sample_warn_allowance and sample_x > 10:
 
-                print('    Match {}/{}: Warned at {} of {} ({} > {})'.format(matching_id, sample_id, sample_x, samples[sample_id][1], hz_score, config['matching_min_score']))
                 matching[matching_id][2] += 1
 
             else:
 
-                print('    Match {}/{}: Failed at {} of {} ({} > {})'.format(matching_id, sample_id, sample_x, samples[sample_id][1], hz_score, config['matching_min_score']))
                 results_end[sample_id][sample_x] += 1
                 del matching[matching_id]
 
@@ -227,7 +204,6 @@ for block_start in range(config['source_frame_start'], config['source_frame_end'
                 if match_any_sample or matching[matching_id][0] == matching_sample_id:
                     sample_id = matching[matching_id][0]
                     sample_x = matching[matching_id][1]
-                    print('    Match {}/{}: Duplicate Complete at {}'.format(matching_id, sample_id, sample_x))
                     results_dupe[sample_id][sample_x] += 1
                     del matching[matching_id] # Cannot be done in the first loop (next to continue), as the order in a dictionary is undefined, so you could have a match that started later, getting tested first.
 
@@ -248,7 +224,6 @@ for block_start in range(config['source_frame_start'], config['source_frame_end'
 
             if hz_score < config['matching_min_score']:
                 match_count += 1
-                print('    Match {}: Start for sample {} at {} ({} < {})'.format(match_count, sample_id, (x + block_start), hz_score, config['matching_min_score']))
                 matching[match_count] = [
                         sample_id,
                         sample_start,
@@ -259,10 +234,10 @@ for block_start in range(config['source_frame_start'], config['source_frame_end'
 
 #--------------------------------------------------
 
-print('')
-print('Matches')
-for match in matches:
-    print(' {} = {} @ {}{}'.format(samples[match[0]][2], str(datetime.timedelta(seconds=match[1])), match[1], (' - Ignored' if match[2] else '')))
+if matches and len(matches) > 0:
+    print('true')
+else:
+    print('false')
 
 if config['output_title'] != None:
 
@@ -331,6 +306,3 @@ if config['output_title'] != None:
     devnull.close()
 
 #--------------------------------------------------
-
-print('')
-print(datetime.datetime.now() - start_time)
